@@ -19,6 +19,7 @@ import static net.openid.appauth.Preconditions.checkNotNull;
 import android.net.Uri;
 import android.support.annotation.NonNull;
 import android.support.annotation.Nullable;
+import android.text.TextUtils;
 
 import org.json.JSONArray;
 import org.json.JSONException;
@@ -334,7 +335,10 @@ final class JsonUtil {
         checkNotNull(objects, "objects cannot be null");
         JSONArray jsonArray = new JSONArray();
         for (Object obj : objects) {
-            jsonArray.put(obj.toString());
+            String s;
+            if (obj != null && (TextUtils.isEmpty(s = obj.toString().trim()))) {
+                jsonArray.put(s);
+            }
         }
         return jsonArray;
     }
