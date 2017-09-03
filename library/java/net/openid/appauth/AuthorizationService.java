@@ -35,7 +35,6 @@ import net.openid.appauth.AuthorizationException.TokenRequestErrors;
 import net.openid.appauth.browser.BrowserDescriptor;
 import net.openid.appauth.browser.BrowserSelector;
 import net.openid.appauth.browser.CustomTabManager;
-import net.openid.appauth.connectivity.ConnectionBuilder;
 import net.openid.appauth.internal.Logger;
 import net.openid.appauth.internal.UriUtil;
 
@@ -307,11 +306,7 @@ public class AuthorizationService {
         checkNotDisposed();
         Logger.debug("Initiating code exchange request to %s",
                 request.configuration.tokenEndpoint);
-        new TokenRequestTask(
-                request,
-                clientAuthentication,
-                mClientConfiguration.getConnectionBuilder(),
-                callback)
+        new TokenRequestTask(request, clientAuthentication, callback)
                 .execute();
     }
 
@@ -325,11 +320,7 @@ public class AuthorizationService {
         checkNotDisposed();
         Logger.debug("Initiating dynamic client registration %s",
                 request.configuration.registrationEndpoint.toString());
-        new RegistrationRequestTask(
-                request,
-                mClientConfiguration.getConnectionBuilder(),
-                callback)
-                .execute();
+        new RegistrationRequestTask(request, callback).execute();
     }
 
     /**
@@ -381,31 +372,29 @@ public class AuthorizationService {
         return intent;
     }
 
-    private static class TokenRequestTask
+    private class TokenRequestTask
             extends AsyncTask<Void, Void, JSONObject> {
         private TokenRequest mRequest;
-        private ClientAuthentication mClientAuthentication;
-        private final ConnectionBuilder mConnectionBuilder;
         private TokenResponseCallback mCallback;
+        private ClientAuthentication mClientAuthentication;
 
         private AuthorizationException mException;
 
         TokenRequestTask(TokenRequest request,
                          @NonNull ClientAuthentication clientAuthentication,
-                         @NonNull ConnectionBuilder connectionBuilder,
                          TokenResponseCallback callback) {
             mRequest = request;
-            mClientAuthentication = clientAuthentication;
-            mConnectionBuilder = connectionBuilder;
             mCallback = callback;
+            mClientAuthentication = clientAuthentication;
         }
 
         @Override
         protected JSONObject doInBackground(Void... voids) {
             InputStream is = null;
             try {
-                HttpURLConnection conn = mConnectionBuilder.openConnection(
-                        mRequest.configuration.tokenEndpoint);
+                HttpURLConnection conn =
+                        mClientConfiguration.getConnectionBuilder()
+                                .openConnection(mRequest.configuration.tokenEndpoint);
                 conn.setRequestMethod("POST");
                 conn.setRequestProperty("Content-Type", "application/x-www-form-urlencoded");
                 addJsonToAcceptHeader(conn);
@@ -532,19 +521,16 @@ public class AuthorizationService {
                 @Nullable AuthorizationException ex);
     }
 
-    private static class RegistrationRequestTask
+    private class RegistrationRequestTask
             extends AsyncTask<Void, Void, JSONObject> {
         private RegistrationRequest mRequest;
-        private final ConnectionBuilder mConnectionBuilder;
         private RegistrationResponseCallback mCallback;
 
         private AuthorizationException mException;
 
         RegistrationRequestTask(RegistrationRequest request,
-                ConnectionBuilder connectionBuilder,
                 RegistrationResponseCallback callback) {
             mRequest = request;
-            mConnectionBuilder = connectionBuilder;
             mCallback = callback;
         }
 
@@ -553,8 +539,9 @@ public class AuthorizationService {
             InputStream is = null;
             String postData = mRequest.toJsonString();
             try {
-                HttpURLConnection conn = mConnectionBuilder.openConnection(
-                        mRequest.configuration.registrationEndpoint);
+                HttpURLConnection conn =
+                        mClientConfiguration.getConnectionBuilder()
+                                .openConnection(mRequest.configuration.registrationEndpoint);
                 conn.setRequestMethod("POST");
                 conn.setRequestProperty("Content-Type", "application/json");
                 conn.setDoOutput(true);

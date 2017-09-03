@@ -16,7 +16,7 @@ android.buildTypes.debug.manifestPlaceholders = [
 ];
 
 dependencies {
-    api "com.android.support:customtabs:${rootProject.supportLibVersion}"
+    compile "com.android.support:customtabs:${rootProject.supportLibVersion}"
     apply from: '../config/testdeps.gradle', to:it
 }
 
