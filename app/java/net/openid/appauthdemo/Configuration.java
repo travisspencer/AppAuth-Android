@@ -201,19 +201,30 @@ public final class Configuration {
 
         mConfigHash = configData.sha256().base64();
         mClientId = getConfigString("client_id");
-        mScope = getRequiredConfigString("authorization_scope");
-        mRedirectUri = getRequiredConfigUri("redirect_uri");
         softwareId = getConfigString("software_id");
-        initialClientId = getConfigString("initial_client_id");
-        initialClientSecret = getConfigString("initial_client_secret");
-        initialScopes = getConfigStrings("initial_client_scopes");
 
-        if (!isRedirectUriRegistered()) {
-            throw new InvalidConfigurationException(
+        if (softwareId == null) {
+            mScope = getRequiredConfigString("authorization_scope");
+            mRedirectUri = getRequiredConfigUri("redirect_uri");
+
+            if (!isRedirectUriRegistered()) {
+                throw new InvalidConfigurationException(
                     "redirect_uri is not handled by any activity in this app! "
-                            + "Ensure that the appAuthRedirectScheme in your build.gradle file "
-                            + "is correctly configured, or that an appropriate intent filter "
-                            + "exists in your app manifest.");
+                        + "Ensure that the appAuthRedirectScheme in your build.gradle file "
+                        + "is correctly configured, or that an appropriate intent filter "
+                        + "exists in your app manifest.");
+            }
+        }
+        else {
+            mScope = getConfigString("authorization_scope");
+            initialClientId = getRequiredConfigString("initial_client_id");
+            initialClientSecret = getConfigString("initial_client_secret");
+
+            if (initialClientSecret == null) {
+                mRedirectUri = getRequiredConfigUri("redirect_uri");
+            }
+
+            initialScopes = getConfigStrings("initial_client_scopes");
         }
 
         if (getConfigString("discovery_uri") == null) {
