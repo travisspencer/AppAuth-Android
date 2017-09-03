@@ -51,6 +51,7 @@ import net.openid.appauth.AuthorizationService;
 import net.openid.appauth.AuthorizationServiceConfiguration;
 import net.openid.appauth.AuthorizationServiceDiscovery;
 import net.openid.appauth.ClientSecretBasic;
+import net.openid.appauth.ClientSecretPost;
 import net.openid.appauth.RegistrationRequest;
 import net.openid.appauth.RegistrationResponse;
 import net.openid.appauth.ResponseTypeValues;
@@ -312,11 +313,10 @@ public final class LoginActivity extends AppCompatActivity {
                         mConfiguration.getInitialClientId())
                         .setGrantType("client_credentials")
                         .setScopes(mConfiguration.getInitialScopes())
-                        .setAdditionalParameters(Collections.singletonMap(
-                            "client_secret", mConfiguration.getInitialClientSecret()))
                         .build();
 
                     mAuthService.performTokenRequest(tokenRequest,
+                        new ClientSecretPost(mConfiguration.getInitialClientSecret()),
                         this::handleRegistrationWithInitialAccessTokenResponse);
                 }
             }
