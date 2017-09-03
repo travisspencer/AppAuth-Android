@@ -56,7 +56,6 @@ import net.openid.appauth.RegistrationRequest;
 import net.openid.appauth.RegistrationResponse;
 import net.openid.appauth.ResponseTypeValues;
 import net.openid.appauth.TokenRequest;
-import net.openid.appauth.TokenResponse;
 import net.openid.appauth.browser.AnyBrowserMatcher;
 import net.openid.appauth.browser.BrowserMatcher;
 import net.openid.appauth.browser.ExactBrowserMatcher;
@@ -288,65 +287,59 @@ public final class LoginActivity extends AppCompatActivity {
             .setTokenEndpointAuthenticationMethod(ClientSecretBasic.NAME);
         String softwareId = mConfiguration.getSoftwareId();
 
-        if (softwareId != null) {
-            // Which kind of authentication is required?
-
-            if (mConfiguration.getInitialClientId() != null) {
-                if (mConfiguration.getInitialClientSecret() == null) {
-                    // We have an initial client ID but not a secret, so implicit flow should be
-                    // used to authenticate the user and get an initial access token that will
-                    // later be used to authenticate access to the registration endpoint
-                    AuthorizationRequest authRequest = new AuthorizationRequest.Builder(
-                        serviceConfig, mConfiguration.getInitialClientId(),
-                        "token", mConfiguration.getRedirectUri())
-                        .setScopes(mConfiguration.getInitialScopes())
-                        .build();
-
-                    mAuthService.performAuthorizationRequest(authRequest,
-                        LoginActivity.createPostAuthorizationRequest(this, authRequest,
-                            serviceConfig.discoveryDoc));
-                }
-                else {
-                    // The client should be authenticated, so we'll do client credential flow to
-                    // get the initial token
-                    TokenRequest tokenRequest = new TokenRequest.Builder(serviceConfig,
-                        mConfiguration.getInitialClientId())
-                        .setGrantType("client_credentials")
-                        .setScopes(mConfiguration.getInitialScopes())
-                        .build();
-
-                    mAuthService.performTokenRequest(tokenRequest,
-                        new ClientSecretPost(mConfiguration.getInitialClientSecret()),
-                        (tokenResponse, authException) -> {
-                            if (authException == null && tokenResponse.accessToken != null)
-                            {
-                                mAuthService.performRegistrationRequest(
-                                    builder.build(),
-                                    this::handleRegistrationResponse, tokenResponse.accessToken);
-                            }
-                            else {
-                                String message = "Could not obtain initial access token needed for registration. " +
-                                    "Check that the initial_client_id and initial_client_secret are provided in the " +
-                                    "configuration and are correct."
-                                    + ((authException != null) ? authException.error : "");
-
-                                runOnUiThread(() -> displayError(message, false));
-                            }
-                        });
-                }
-            }
-            // else, we don't have a client ID, but we do have a software_id, so no authentication
-            // is required to do registration. We can't use the software_id in this case. The
-            // app is misconfigured. Perhaps the software_id just shouldn't be there, so we'll warn
-            // and try regular registration.
-            Log.w(TAG, String.format("A software_id of %s was provided without an " +
-                "initial_client_id. An initial_client_id is required when performing registration " +
-                "with a software_id. Regular registration will be attempted.", softwareId));
-        }
-
-        mAuthService.performRegistrationRequest(
+        if (softwareId == null) {
+            mAuthService.performRegistrationRequest(
                 builder.build(),
                 this::handleRegistrationResponse);
+        }
+        else if (mConfiguration.getInitialClientId() != null) {
+            // Which kind of authentication is required?
+
+            builder.setAdditionalParameters(Collections.singletonMap("software_id", softwareId));
+
+            if (mConfiguration.getInitialClientSecret() == null) {
+                // We have an initial client ID but not a secret, so implicit flow should be
+                // used to authenticate the user and get an initial access token that will
+                // later be used to authenticate access to the registration endpoint
+                AuthorizationRequest authRequest = new AuthorizationRequest.Builder(
+                    serviceConfig, mConfiguration.getInitialClientId(),
+                    "token", mConfiguration.getRedirectUri())
+                    .setScopes(mConfiguration.getInitialScopes())
+                    .build();
+
+                mAuthService.performAuthorizationRequest(authRequest,
+                    LoginActivity.createPostAuthorizationRequest(this, authRequest,
+                        serviceConfig.discoveryDoc));
+            }
+            else {
+                // The client should be authenticated, so we'll do client credential flow to
+                // get the initial token
+                TokenRequest tokenRequest = new TokenRequest.Builder(serviceConfig,
+                    mConfiguration.getInitialClientId())
+                    .setGrantType("client_credentials")
+                    .setScopes(mConfiguration.getInitialScopes())
+                    .build();
+
+                mAuthService.performTokenRequest(tokenRequest,
+                    new ClientSecretPost(mConfiguration.getInitialClientSecret()),
+                    (tokenResponse, authException) -> {
+                        if (authException == null && tokenResponse.accessToken != null)
+                        {
+                            mAuthService.performRegistrationRequest(
+                                builder.build(),
+                                this::handleRegistrationResponse, tokenResponse.accessToken);
+                        }
+                        else {
+                            String message = "Could not obtain initial access token needed for registration. " +
+                                "Check that the initial_client_id and initial_client_secret are provided in the " +
+                                "configuration and are correct."
+                                + ((authException != null) ? authException.error : "");
+
+                            runOnUiThread(() -> displayError(message, false));
+                        }
+                    });
+            }
+        }
     }
 
     private static PendingIntent createPostAuthorizationRequest(
