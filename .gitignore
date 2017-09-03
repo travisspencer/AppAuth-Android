@@ -3,6 +3,6 @@
 build
 app/build
 library/build
-.idea/*
+.idea
 *.iml
 appauth.keystore
