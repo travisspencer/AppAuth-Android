@@ -1,10 +1,9 @@
 {
-  "client_id": "",
   "redirect_uri": "net.openid.appauthdemo:/oauth2redirect",
-  "authorization_scope": "openid email profile",
-  "discovery_uri": "",
-  "authorization_endpoint_uri": "",
-  "token_endpoint_uri": "",
-  "registration_endpoint_uri": "",
-  "https_required": true
+  "discovery_uri": "https://192.168.1.75:8443/dev/oauth/anonymous/.well-known/openid-configuration",
+  "https_required": false,
+  "software_id": "dynamic-client-template",
+  "initial_client_id": "client-one",
+  "initial_client_secret": "0ne!Secret",
+  "initial_client_scopes": ["dcr"]
 }
