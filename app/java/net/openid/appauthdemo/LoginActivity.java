@@ -317,7 +317,22 @@ public final class LoginActivity extends AppCompatActivity {
 
                     mAuthService.performTokenRequest(tokenRequest,
                         new ClientSecretPost(mConfiguration.getInitialClientSecret()),
-                        this::handleRegistrationWithInitialAccessTokenResponse);
+                        (tokenResponse, authException) -> {
+                            if (authException == null && tokenResponse.accessToken != null)
+                            {
+                                mAuthService.performRegistrationRequest(
+                                    builder.build(),
+                                    this::handleRegistrationResponse, tokenResponse.accessToken);
+                            }
+                            else {
+                                String message = "Could not obtain initial access token needed for registration. " +
+                                    "Check that the initial_client_id and initial_client_secret are provided in the " +
+                                    "configuration and are correct."
+                                    + ((authException != null) ? authException.error : "");
+
+                                runOnUiThread(() -> displayError(message, false));
+                            }
+                        });
                 }
             }
             // else, we don't have a client ID, but we do have a software_id, so no authentication
@@ -332,23 +347,6 @@ public final class LoginActivity extends AppCompatActivity {
         mAuthService.performRegistrationRequest(
                 builder.build(),
                 this::handleRegistrationResponse);
-    }
-
-    private void handleRegistrationWithInitialAccessTokenResponse(
-        @Nullable TokenResponse tokenResponse,
-        @Nullable AuthorizationException authException) {
-        if (authException == null && tokenResponse.accessToken != null)
-        {
-            // TODO: Implement non-exceptional case by registering with new AT
-        }
-        else {
-            String message = "Could not obtain initial access token needed for registration. " +
-                "Check that the initial_client_id and initial_client_secret are provided in the " +
-                "configuration and are correct."
-                + ((authException != null) ? authException.error : "");
-
-            runOnUiThread(() -> displayError(message, false));
-        }
     }
 
     private static PendingIntent createPostAuthorizationRequest(

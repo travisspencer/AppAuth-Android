@@ -317,10 +317,16 @@ public class AuthorizationService {
     public void performRegistrationRequest(
             @NonNull RegistrationRequest request,
             @NonNull RegistrationResponseCallback callback) {
+        performRegistrationRequest(request, callback, null);
+    }
+
+    public void performRegistrationRequest(RegistrationRequest request,
+                                           RegistrationResponseCallback callback,
+                                           @Nullable String initialAccessToken) {
         checkNotDisposed();
         Logger.debug("Initiating dynamic client registration %s",
-                request.configuration.registrationEndpoint.toString());
-        new RegistrationRequestTask(request, callback).execute();
+            request.configuration.registrationEndpoint.toString());
+        new RegistrationRequestTask(request, callback, initialAccessToken).execute();
     }
 
     /**
@@ -523,15 +529,19 @@ public class AuthorizationService {
 
     private class RegistrationRequestTask
             extends AsyncTask<Void, Void, JSONObject> {
+        @Nullable
+        private final String mInitialAccessToken;
         private RegistrationRequest mRequest;
         private RegistrationResponseCallback mCallback;
 
         private AuthorizationException mException;
 
         RegistrationRequestTask(RegistrationRequest request,
-                RegistrationResponseCallback callback) {
+                                RegistrationResponseCallback callback,
+                                @Nullable String initialAccessToken) {
             mRequest = request;
             mCallback = callback;
+            mInitialAccessToken = initialAccessToken;
         }
 
         @Override
@@ -543,6 +553,11 @@ public class AuthorizationService {
                         mClientConfiguration.getConnectionBuilder()
                                 .openConnection(mRequest.configuration.registrationEndpoint);
                 conn.setRequestMethod("POST");
+
+                if (mInitialAccessToken != null) {
+                    conn.setRequestProperty("Authorization", "Bearer " + mInitialAccessToken);
+                }
+
                 conn.setRequestProperty("Content-Type", "application/json");
                 conn.setDoOutput(true);
                 conn.setRequestProperty("Content-Length", String.valueOf(postData.length()));
