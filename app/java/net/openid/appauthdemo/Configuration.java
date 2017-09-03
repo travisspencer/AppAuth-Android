@@ -30,12 +30,16 @@ import okio.Buffer;
 import okio.BufferedSource;
 import okio.Okio;
 
+import org.json.JSONArray;
 import org.json.JSONException;
 import org.json.JSONObject;
 
 import java.io.IOException;
 import java.lang.ref.WeakReference;
 import java.nio.charset.Charset;
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.List;
 
 /**
  * Reads and validates the demo app configuration from `res/raw/auth_config.json`. Configuration
@@ -67,6 +71,10 @@ public final class Configuration {
     private Uri mTokenEndpointUri;
     private Uri mRegistrationEndpointUri;
     private boolean mHttpsRequired;
+    @Nullable private String softwareId;
+    @Nullable private String initialClientSecret;
+    @Nullable private String initialClientId;
+    @Nullable private Iterable<String> initialScopes;
 
     public static Configuration getInstance(Context context) {
         Configuration config = sInstance.get();
@@ -119,6 +127,11 @@ public final class Configuration {
      */
     public void acceptConfiguration() {
         mPrefs.edit().putString(KEY_LAST_HASH, mConfigHash).apply();
+    }
+
+    @Nullable
+    public String getSoftwareId() {
+        return softwareId;
     }
 
     @Nullable
@@ -190,6 +203,10 @@ public final class Configuration {
         mClientId = getConfigString("client_id");
         mScope = getRequiredConfigString("authorization_scope");
         mRedirectUri = getRequiredConfigUri("redirect_uri");
+        softwareId = getConfigString("software_id");
+        initialClientId = getConfigString("initial_client_id");
+        initialClientSecret = getConfigString("initial_client_secret");
+        initialScopes = getConfigStrings("initial_client_scopes");
 
         if (!isRedirectUriRegistered()) {
             throw new InvalidConfigurationException(
@@ -212,6 +229,26 @@ public final class Configuration {
         }
 
         mHttpsRequired = mConfigJson.optBoolean("https_required", true);
+    }
+
+    private Iterable<String> getConfigStrings(String propName) {
+        JSONArray value = mConfigJson.optJSONArray(propName);
+
+        if (value == null) {
+            return Collections.emptyList();
+        }
+
+        List<String> result = new ArrayList<>();
+
+        for (int i = 0; i < value.length(); i++) {
+            String v = value.optString(i);
+
+            if (v != null && !TextUtils.isEmpty((v = v.trim()))) {
+                result.add(i, v);
+            }
+        }
+
+        return result;
     }
 
     @Nullable
@@ -294,6 +331,21 @@ public final class Configuration {
         redirectIntent.setData(mRedirectUri);
 
         return !mContext.getPackageManager().queryIntentActivities(redirectIntent, 0).isEmpty();
+    }
+
+    @Nullable
+    public String getInitialClientId() {
+        return initialClientId;
+    }
+
+    @Nullable
+    public String getInitialClientSecret() {
+        return initialClientSecret;
+    }
+
+    @Nullable
+    public Iterable<String> getInitialScopes() {
+        return initialScopes;
     }
 
     public static final class InvalidConfigurationException extends Exception {
