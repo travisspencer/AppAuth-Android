@@ -16,6 +16,7 @@ package net.openid.appauthdemo;
 
 import android.annotation.TargetApi;
 import android.app.PendingIntent;
+import android.content.Context;
 import android.content.Intent;
 import android.os.Build;
 import android.os.Bundle;
@@ -48,10 +49,13 @@ import net.openid.appauth.AuthorizationException;
 import net.openid.appauth.AuthorizationRequest;
 import net.openid.appauth.AuthorizationService;
 import net.openid.appauth.AuthorizationServiceConfiguration;
+import net.openid.appauth.AuthorizationServiceDiscovery;
 import net.openid.appauth.ClientSecretBasic;
 import net.openid.appauth.RegistrationRequest;
 import net.openid.appauth.RegistrationResponse;
 import net.openid.appauth.ResponseTypeValues;
+import net.openid.appauth.TokenRequest;
+import net.openid.appauth.TokenResponse;
 import net.openid.appauth.browser.AnyBrowserMatcher;
 import net.openid.appauth.browser.BrowserMatcher;
 import net.openid.appauth.browser.ExactBrowserMatcher;
@@ -261,8 +265,9 @@ public final class LoginActivity extends AppCompatActivity {
             return;
         }
 
-        RegistrationResponse lastResponse =
-                mAuthStateManager.getCurrent().getLastRegistrationResponse();
+        AuthState state = mAuthStateManager.getCurrent();
+        RegistrationResponse lastResponse = state.getLastRegistrationResponse();
+
         if (lastResponse != null) {
             Log.i(TAG, "Using dynamic client ID: " + lastResponse.clientId);
             // already dynamically registered a client ID
@@ -276,15 +281,86 @@ public final class LoginActivity extends AppCompatActivity {
         runOnUiThread(() -> displayLoading("Dynamically registering client"));
         Log.i(TAG, "Dynamically registering client");
 
-        RegistrationRequest registrationRequest = new RegistrationRequest.Builder(
-                mAuthStateManager.getCurrent().getAuthorizationServiceConfiguration(),
-                Collections.singletonList(mConfiguration.getRedirectUri()))
-                .setTokenEndpointAuthenticationMethod(ClientSecretBasic.NAME)
-                .build();
+        AuthorizationServiceConfiguration serviceConfig = state.getAuthorizationServiceConfiguration();
+        RegistrationRequest.Builder builder = new RegistrationRequest.Builder(
+            serviceConfig, Collections.singletonList(mConfiguration.getRedirectUri()))
+            .setTokenEndpointAuthenticationMethod(ClientSecretBasic.NAME);
+        String softwareId = mConfiguration.getSoftwareId();
+
+        if (softwareId != null) {
+            // Which kind of authentication is required?
+
+            if (mConfiguration.getInitialClientId() != null) {
+                if (mConfiguration.getInitialClientSecret() == null) {
+                    // We have an initial client ID but not a secret, so implicit flow should be
+                    // used to authenticate the user and get an initial access token that will
+                    // later be used to authenticate access to the registration endpoint
+                    AuthorizationRequest authRequest = new AuthorizationRequest.Builder(
+                        serviceConfig, mConfiguration.getInitialClientId(),
+                        "token", mConfiguration.getRedirectUri())
+                        .setScopes(mConfiguration.getInitialScopes())
+                        .build();
+
+                    mAuthService.performAuthorizationRequest(authRequest,
+                        LoginActivity.createPostAuthorizationRequest(this, authRequest,
+                            serviceConfig.discoveryDoc));
+                }
+                else {
+                    // The client should be authenticated, so we'll do client credential flow to
+                    // get the initial token
+                    TokenRequest tokenRequest = new TokenRequest.Builder(serviceConfig,
+                        mConfiguration.getInitialClientId())
+                        .setGrantType("client_credentials")
+                        .setScopes(mConfiguration.getInitialScopes())
+                        .setAdditionalParameters(Collections.singletonMap(
+                            "client_secret", mConfiguration.getInitialClientSecret()))
+                        .build();
+
+                    mAuthService.performTokenRequest(tokenRequest,
+                        this::handleRegistrationWithInitialAccessTokenResponse);
+                }
+            }
+            // else, we don't have a client ID, but we do have a software_id, so no authentication
+            // is required to do registration. We can't use the software_id in this case. The
+            // app is misconfigured. Perhaps the software_id just shouldn't be there, so we'll warn
+            // and try regular registration.
+            Log.w(TAG, String.format("A software_id of %s was provided without an " +
+                "initial_client_id. An initial_client_id is required when performing registration " +
+                "with a software_id. Regular registration will be attempted.", softwareId));
+        }
 
         mAuthService.performRegistrationRequest(
-                registrationRequest,
+                builder.build(),
                 this::handleRegistrationResponse);
+    }
+
+    private void handleRegistrationWithInitialAccessTokenResponse(
+        @Nullable TokenResponse tokenResponse,
+        @Nullable AuthorizationException authException) {
+        if (authException == null && tokenResponse.accessToken != null)
+        {
+            // TODO: Implement non-exceptional case by registering with new AT
+        }
+        else {
+            String message = "Could not obtain initial access token needed for registration. " +
+                "Check that the initial_client_id and initial_client_secret are provided in the " +
+                "configuration and are correct."
+                + ((authException != null) ? authException.error : "");
+
+            runOnUiThread(() -> displayError(message, false));
+        }
+    }
+
+    private static PendingIntent createPostAuthorizationRequest(
+        @NonNull Context context,
+        @NonNull AuthorizationRequest request,
+        @NonNull AuthorizationServiceDiscovery discoveryDoc)
+    {
+        Intent intent = new Intent(context, LoginActivity.class);
+
+        // TODO: Save info that might be needed
+
+        return PendingIntent.getActivity(context, request.hashCode(), intent, 0);
     }
 
     @MainThread
