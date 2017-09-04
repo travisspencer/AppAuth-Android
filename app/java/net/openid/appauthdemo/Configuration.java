@@ -30,16 +30,15 @@ import okio.Buffer;
 import okio.BufferedSource;
 import okio.Okio;
 
-import org.json.JSONArray;
 import org.json.JSONException;
 import org.json.JSONObject;
 
 import java.io.IOException;
 import java.lang.ref.WeakReference;
 import java.nio.charset.Charset;
-import java.util.ArrayList;
-import java.util.Collections;
-import java.util.List;
+
+import static android.text.TextUtils.split;
+import static java.util.Arrays.asList;
 
 /**
  * Reads and validates the demo app configuration from `res/raw/auth_config.json`. Configuration
@@ -224,7 +223,7 @@ public final class Configuration {
                 mRedirectUri = getRequiredConfigUri("redirect_uri");
             }
 
-            initialScopes = getConfigStrings("initial_client_scopes");
+            initialScopes = asList(split(getConfigString("initial_client_scope"), " "));
         }
 
         if (getConfigString("discovery_uri") == null) {
@@ -240,26 +239,6 @@ public final class Configuration {
         }
 
         mHttpsRequired = mConfigJson.optBoolean("https_required", true);
-    }
-
-    private Iterable<String> getConfigStrings(String propName) {
-        JSONArray value = mConfigJson.optJSONArray(propName);
-
-        if (value == null) {
-            return Collections.emptyList();
-        }
-
-        List<String> result = new ArrayList<>();
-
-        for (int i = 0; i < value.length(); i++) {
-            String v = value.optString(i);
-
-            if (v != null && !TextUtils.isEmpty((v = v.trim()))) {
-                result.add(i, v);
-            }
-        }
-
-        return result;
     }
 
     @Nullable

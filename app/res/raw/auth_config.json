@@ -5,5 +5,5 @@
   "software_id": "dynamic-client-template",
   "initial_client_id": "client-one",
   "initial_client_secret": "0ne!Secret",
-  "initial_client_scopes": ["dcr"]
+  "initial_client_scope": "dcr"
 }
