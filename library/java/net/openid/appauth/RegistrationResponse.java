@@ -14,6 +14,7 @@
 
 package net.openid.appauth;
 
+import static android.content.ContentValues.TAG;
 import static net.openid.appauth.AdditionalParamsProcessor.checkAdditionalParams;
 import static net.openid.appauth.AdditionalParamsProcessor.extractAdditionalParams;
 import static net.openid.appauth.Preconditions.checkNotEmpty;
@@ -23,7 +24,9 @@ import android.net.Uri;
 import android.support.annotation.NonNull;
 import android.support.annotation.Nullable;
 import android.support.annotation.VisibleForTesting;
+import android.util.Log;
 
+import org.json.JSONArray;
 import org.json.JSONException;
 import org.json.JSONObject;
 
@@ -42,6 +45,7 @@ public class RegistrationResponse {
     static final String PARAM_REGISTRATION_CLIENT_URI = "registration_client_uri";
     static final String PARAM_CLIENT_ID_ISSUED_AT = "client_id_issued_at";
     static final String PARAM_TOKEN_ENDPOINT_AUTH_METHOD = "token_endpoint_auth_method";
+    public static final String PARAM_REDIRECT_URIS = "redirect_uris";
 
     static final String KEY_REQUEST = "request";
     static final String KEY_ADDITIONAL_PARAMETERS = "additionalParameters";
@@ -53,7 +57,8 @@ public class RegistrationResponse {
             PARAM_REGISTRATION_ACCESS_TOKEN,
             PARAM_REGISTRATION_CLIENT_URI,
             PARAM_CLIENT_ID_ISSUED_AT,
-            PARAM_TOKEN_ENDPOINT_AUTH_METHOD
+            PARAM_TOKEN_ENDPOINT_AUTH_METHOD,
+            PARAM_REDIRECT_URIS
     ));
 
     /**
@@ -61,6 +66,9 @@ public class RegistrationResponse {
      */
     @NonNull
     public final RegistrationRequest request;
+
+    @NonNull
+    public final Uri redirectUri;
 
     /**
      * The registered client identifier.
@@ -158,8 +166,12 @@ public class RegistrationResponse {
         @NonNull
         private String mClientId;
 
+        @NonNull
+        private Uri mRedirectUri;
+
         @Nullable
         private Long mClientIdIssuedAt;
+
         @Nullable
         private String mClientSecret;
         @Nullable
@@ -170,7 +182,6 @@ public class RegistrationResponse {
         private Uri mRegistrationClientUri;
         @Nullable
         private String mTokenEndpointAuthMethod;
-
         @NonNull
         private Map<String, String> mAdditionalParameters = Collections.emptyMap();
 
@@ -223,6 +234,11 @@ public class RegistrationResponse {
          */
         public Builder setClientSecret(@Nullable String clientSecret) {
             mClientSecret = clientSecret;
+            return this;
+        }
+
+        public Builder setRedirectUri(@NonNull String redirectUri) {
+            mRedirectUri = Uri.parse(redirectUri);
             return this;
         }
 
@@ -282,13 +298,15 @@ public class RegistrationResponse {
             return new RegistrationResponse(
                     mRequest,
                     mClientId,
+                    mRedirectUri,
                     mClientIdIssuedAt,
                     mClientSecret,
                     mClientSecretExpiresAt,
                     mRegistrationAccessToken,
                     mRegistrationClientUri,
                     mTokenEndpointAuthMethod,
-                    mAdditionalParameters);
+                    mAdditionalParameters
+            );
         }
 
         /**
@@ -330,6 +348,23 @@ public class RegistrationResponse {
                 setClientSecretExpiresAt(json.getLong(PARAM_CLIENT_SECRET_EXPIRES_AT));
             }
 
+            if (json.has(PARAM_REDIRECT_URIS)) {
+                JSONArray jsonArray = json.getJSONArray(PARAM_REDIRECT_URIS);
+
+                if (jsonArray.length() > 1) {
+                    Log.w(TAG, String.format("The OAuth server returned multiple redirects. Only " +
+                        "the first will be used, all = %s, used = %s", jsonArray, mRedirectUri));
+                }
+                else if (jsonArray.length() == 0) {
+                    throw new RegistrationResponse.MissingArgumentException(PARAM_REDIRECT_URIS);
+                }
+
+                setRedirectUri(jsonArray.getString(0));
+            }
+            else {
+                throw new MissingArgumentException(PARAM_REDIRECT_URIS);
+            }
+
             if (json.has(PARAM_REGISTRATION_ACCESS_TOKEN)
                     != json.has(PARAM_REGISTRATION_CLIENT_URI)) {
                 /*
@@ -354,15 +389,16 @@ public class RegistrationResponse {
     }
 
     private RegistrationResponse(
-            @NonNull RegistrationRequest request,
-            @NonNull String clientId,
-            @Nullable Long clientIdIssuedAt,
-            @Nullable String clientSecret,
-            @Nullable Long clientSecretExpiresAt,
-            @Nullable String registrationAccessToken,
-            @Nullable Uri registrationClientUri,
-            @Nullable String tokenEndpointAuthMethod,
-            @NonNull Map<String, String> additionalParameters) {
+        @NonNull RegistrationRequest request,
+        @NonNull String clientId,
+        @NonNull Uri redirectUri,
+        @Nullable Long clientIdIssuedAt,
+        @Nullable String clientSecret,
+        @Nullable Long clientSecretExpiresAt,
+        @Nullable String registrationAccessToken,
+        @Nullable Uri registrationClientUri,
+        @Nullable String tokenEndpointAuthMethod,
+        @NonNull Map<String, String> additionalParameters) {
         this.request = request;
         this.clientId = clientId;
         this.clientIdIssuedAt = clientIdIssuedAt;
@@ -372,6 +408,7 @@ public class RegistrationResponse {
         this.registrationClientUri = registrationClientUri;
         this.tokenEndpointAuthMethod = tokenEndpointAuthMethod;
         this.additionalParameters = additionalParameters;
+        this.redirectUri = redirectUri;
     }
 
     /**
@@ -416,6 +453,7 @@ public class RegistrationResponse {
         JSONObject json = new JSONObject();
         JsonUtil.put(json, KEY_REQUEST, request.jsonSerialize());
         JsonUtil.put(json, PARAM_CLIENT_ID, clientId);
+        JsonUtil.put(json, PARAM_REDIRECT_URIS, redirectUri.toString());
         JsonUtil.putIfNotNull(json, PARAM_CLIENT_ID_ISSUED_AT, clientIdIssuedAt);
         JsonUtil.putIfNotNull(json, PARAM_CLIENT_SECRET, clientSecret);
         JsonUtil.putIfNotNull(json, PARAM_CLIENT_SECRET_EXPIRES_AT, clientSecretExpiresAt);
@@ -453,6 +491,7 @@ public class RegistrationResponse {
         return new Builder(
                 RegistrationRequest.jsonDeserialize(json.getJSONObject(KEY_REQUEST)))
                 .setClientId(JsonUtil.getString(json, PARAM_CLIENT_ID))
+                .setRedirectUri(JsonUtil.getString(json, PARAM_REDIRECT_URIS))
                 .setClientIdIssuedAt(JsonUtil.getLongIfDefined(json, PARAM_CLIENT_ID_ISSUED_AT))
                 .setClientSecret(JsonUtil.getStringIfDefined(json, PARAM_CLIENT_SECRET))
                 .setClientSecretExpiresAt(

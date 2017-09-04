@@ -18,6 +18,7 @@ import android.annotation.TargetApi;
 import android.app.PendingIntent;
 import android.content.Context;
 import android.content.Intent;
+import android.net.Uri;
 import android.os.Build;
 import android.os.Bundle;
 import android.os.Handler;
@@ -367,7 +368,7 @@ public final class LoginActivity extends AppCompatActivity {
 
         Log.i(TAG, "Dynamically registered client: " + response.clientId);
         mClientId.set(response.clientId);
-        initializeAuthRequest();
+        initializeAuthRequest(response.redirectUri);
     }
 
     /**
@@ -392,7 +393,7 @@ public final class LoginActivity extends AppCompatActivity {
                 }
 
                 recreateAuthorizationService();
-                createAuthRequest(getLoginHint());
+                createAuthRequest(getLoginHint(), null);
                 warmUpBrowser();
             }
 
@@ -481,7 +482,13 @@ public final class LoginActivity extends AppCompatActivity {
 
     @MainThread
     private void initializeAuthRequest() {
-        createAuthRequest(getLoginHint());
+        initializeAuthRequest(null); // TODO: Get redirect from DCR response instead
+    }
+
+    @MainThread
+
+    private void initializeAuthRequest(@Nullable Uri redirectUri) {
+        createAuthRequest(getLoginHint(), redirectUri);
         warmUpBrowser();
         displayAuthOptions();
     }
@@ -533,13 +540,13 @@ public final class LoginActivity extends AppCompatActivity {
         });
     }
 
-    private void createAuthRequest(@Nullable String loginHint) {
+    private void createAuthRequest(@Nullable String loginHint, @Nullable Uri redirectUri) {
         Log.i(TAG, "Creating auth request for login hint: " + loginHint);
         AuthorizationRequest.Builder authRequestBuilder = new AuthorizationRequest.Builder(
                 mAuthStateManager.getCurrent().getAuthorizationServiceConfiguration(),
                 mClientId.get(),
                 ResponseTypeValues.CODE,
-                mConfiguration.getRedirectUri())
+                redirectUri == null ? mConfiguration.getRedirectUri() : redirectUri)
                 .setScope(mConfiguration.getScope());
 
         if (!TextUtils.isEmpty(loginHint)) {
@@ -607,7 +614,7 @@ public final class LoginActivity extends AppCompatActivity {
                 return;
             }
 
-            createAuthRequest(getLoginHint());
+            createAuthRequest(getLoginHint(), null);
             warmUpBrowser();
         }
 
