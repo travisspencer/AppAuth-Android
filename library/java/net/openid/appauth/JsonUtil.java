@@ -336,7 +336,7 @@ final class JsonUtil {
         JSONArray jsonArray = new JSONArray();
         for (Object obj : objects) {
             String s;
-            if (obj != null && (TextUtils.isEmpty(s = obj.toString().trim()))) {
+            if (obj != null && (!TextUtils.isEmpty(s = obj.toString().trim()))) {
                 jsonArray.put(s);
             }
         }
